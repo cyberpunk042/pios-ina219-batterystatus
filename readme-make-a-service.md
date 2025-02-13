@@ -1,6 +1,3 @@
-1) Use Your Desktop Environment’s Autostart Folder
-Most Linux desktops (GNOME, KDE, Xfce, etc.) support a ~/.config/autostart folder. Any .desktop files in there get started automatically after you log in—ideal for tray apps.
-
 Create a .desktop file (e.g. battery_tray.desktop) in ~/.config/autostart:  
 ```bash
 mkdir -p ~/.config/autostart
