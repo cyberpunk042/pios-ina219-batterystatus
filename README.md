@@ -1,6 +1,6 @@
 # CrowPi L Battery status
 
-Battery status for the [CrowPi L laptop](https://www.crowpi.cc/products/crowpi-l), with the native Linux Raspberry Pi OS, standing in the system tray, written with python3 and python3-pyqt5.
+Battery status for the INA219 sensor on I2C with the native Linux Raspberry Pi OS, standing in the system tray, written with python3 and python3-pyqt5.
 
 ![Animation](anim.gif)
 
