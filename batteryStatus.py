@@ -40,7 +40,7 @@ class INA219:
       - Calibrates for expected max current + known shunt resistor
       - Provides read_bus_voltage(), read_shunt_voltage(), read_current()
     """
-    def __init__(self, address=0x40, i2c_bus=1, shunt_ohms=0.1, max_expected_amps=3.2):
+    def __init__(self, address=0x41, i2c_bus=1, shunt_ohms=0.1, max_expected_amps=3.2):
         self.bus = smbus.SMBus(i2c_bus)
         self.address = address
         self.shunt_ohms = shunt_ohms
@@ -58,11 +58,11 @@ class INA219:
          - Shunt ADC = 12-bit (SADC=1111)
          - Mode = continuous shunt and bus (MODE=111)
         """
-        brng = 0  # 0 => 16V range
-        pg = 0    # 0 => gain /1 (±40 mV)
-        badc = 0xF  # 1111 => 12-bit (sample)
-        sadc = 0xF  # 1111 => 12-bit (sample)
-        mode = 0x7  # 111 => continuous shunt & bus
+        brng = 0   # 0 => 16V range
+        pg = 0     # 0 => gain /1 (±40 mV)
+        badc = 0xF # 1111 => 12-bit (sample)
+        sadc = 0xF # 1111 => 12-bit (sample)
+        mode = 0x7 # 111 => continuous shunt & bus
 
         config = ((brng & 0x1) << 13) \
                | ((pg & 0x3) << 11)   \
@@ -133,32 +133,35 @@ class INA219:
 #############################
 
 I2C_ADDRESS = 0x41   # Your INA219 I2C address (often 0x40 or 0x41)
-I2C_BUS = 1          # e.g. Raspberry Pi uses bus=1
-SHUNT_OHMS = 0.1     # e.g. a 0.1 Ω shunt
+I2C_BUS = 1          # e.g. Raspberry Pi bus=1
+SHUNT_OHMS = 0.1     # Shunt resistor value
 MAX_CURRENT = 3.2    # Max expected current in amps
-POLL_INTERVAL = 5    # Seconds between updates
 
-# For demonstration: battery = 3S Li-ion => ~9.0 V (empty) to ~12.6 V (full)
-MIN_VOLTAGE = 9.0
-MAX_VOLTAGE = 12.6
+# For demonstration: a 3S Li-ion => ~9.0 V (empty) to ~12.6 V (full).
+MIN_VOLTAGE     = 10.4
+MAX_VOLTAGE     = 12
 
-# SysFS or fallback file (optional) if you want to write battery percentage somewhere
+# Voltage below which we want an automatic shutdown:
+SHUTDOWN_VOLTAGE = 10.5
+
+# How frequently to update (seconds)
+POLL_INTERVAL = 5
+
+# SysFS or fallback file if you want to write battery percentage
 SYSFS_BATTERY_CAPACITY_PATH = "/sys/class/power_supply/BAT0/capacity"
 FALLBACK_PATH = "/tmp/battery_status"
 
-# If you want logging info in the console:
 logging.basicConfig(format="%(message)s", level=logging.INFO)
 
 #############################
-# Utility function to write %
-# battery % to sysfs        #
+# Utility: write battery %  #
 #############################
 def write_battery_percentage(percentage):
     """
-    Example: tries to write battery percentage to a sysfs file, then fallback to /tmp.
-    Clamp percentage to [0..100].
+    Example: tries to write battery percentage to a sysfs file, or fallback to /tmp.
+    Clamps percentage to [0..100].
     """
-    percentage = int(max(0, min(100, percentage)))  # clamp
+    percentage = int(max(0, min(100, percentage)))
     try:
         with open(SYSFS_BATTERY_CAPACITY_PATH, "w") as f:
             f.write(f"{percentage}\n")
@@ -178,8 +181,11 @@ def write_battery_percentage(percentage):
         print(f"Error writing battery percentage: {e}")
 
 #############################
-# QThread Worker           #
+# QThread Worker            #
 #############################
+
+mustHalt = False
+mutex = QMutex()
 
 class Worker(QObject):
     finished = pyqtSignal()
@@ -188,7 +194,7 @@ class Worker(QObject):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        # Initialize our INA219 with proper config
+        # Initialize our INA219
         self.ina = INA219(
             address=I2C_ADDRESS,
             i2c_bus=I2C_BUS,
@@ -206,36 +212,48 @@ class Worker(QObject):
                 break
             mutex.unlock()
 
-            # Read voltage from INA219
+            # Read bus voltage
             bus_voltage = self.ina.read_bus_voltage()
             if bus_voltage is not None:
-                # Convert to a "battery %" from MIN_VOLTAGE..MAX_VOLTAGE
+                # 1) Check for shutdown condition
+                if bus_voltage <= SHUTDOWN_VOLTAGE:
+                    # Show an alert icon at the last moment
+                    self.trayMessage.emit(9, bus_voltage, 0)
+                    self.logMessage.emit(f"Voltage {bus_voltage:.2f}V <= {SHUTDOWN_VOLTAGE}V. Shutting down...")
+
+                    # Attempt a graceful shutdown (requires sufficient permissions)
+                    os.system('sudo shutdown -h now "Battery too low"')
+                    # Or, for example: os.system('systemctl poweroff -i')
+
+                    # Break out of loop (app will exit)
+                    break
+
+                # 2) Compute battery % from min->max voltage
                 percentage = (bus_voltage - MIN_VOLTAGE) / (MAX_VOLTAGE - MIN_VOLTAGE) * 100
                 percentage = max(0, min(100, percentage))
 
-                # Figure out which icon to use (0..7 for empty->full, etc.)
+                # Pick tray icon
                 icon_index = self.pick_icon(percentage)
-
-                # Emit to update tray
+                # Emit so the tray updates
                 self.trayMessage.emit(icon_index, bus_voltage, percentage)
 
-                # Optionally write battery % to sysfs/fallback
+                # Write battery percentage somewhere if desired
                 write_battery_percentage(percentage)
             else:
-                # reading error => show alert icon
+                # If reading fails, show alert icon
                 self.trayMessage.emit(9, 0.0, 0.0)
                 self.logMessage.emit("INA219 read error")
 
             time.sleep(POLL_INTERVAL)
 
+        # End run
         self.finished.emit()
 
     def pick_icon(self, percentage):
         """
-        Return an integer index [0..7,9,...] corresponding to battery icons.
-        Feel free to map these to your own icon sets more precisely.
+        Return integer index [0..7,9,10], matching loaded icons.
+        Feel free to adapt thresholds as needed.
         """
-        # Example approach: each 14% step up to 100
         if percentage <= 5:
             return 0
         elif percentage < 15:
@@ -253,14 +271,11 @@ class Worker(QObject):
         elif percentage < 95:
             return 6
         else:
-            return 7  # "full"
+            return 7  # full
 
 #############################
-# Main Application / Tray  #
+# Main (Tray Setup)         #
 #############################
-
-mustHalt = False
-mutex = QMutex()
 
 def halt():
     global mustHalt
@@ -276,17 +291,17 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    # Provide your icons (ensure these files exist or update paths)
+    # Icons (make sure these image files exist in your current directory or provide full paths)
     icons = [
-        QIcon("battery_0.png"),        # 0: very low
+        QIcon("battery_0.png"),        # 0
         QIcon("battery_1.png"),        # 1
         QIcon("battery_2.png"),        # 2
         QIcon("battery_3.png"),        # 3
         QIcon("battery_4.png"),        # 4
         QIcon("battery_5.png"),        # 5
         QIcon("battery_6.png"),        # 6
-        QIcon("battery_7.png"),        # 7: full
-        QIcon("battery_charging.png"), # 8 (not used unless you add charging logic)
+        QIcon("battery_7.png"),        # 7
+        QIcon("battery_charging.png"), # 8 (unused here)
         QIcon("battery_alert.png"),    # 9
         QIcon("battery_unknown.png"),  # 10
     ]
@@ -305,10 +320,9 @@ if __name__ == "__main__":
     ]
 
     tray = QSystemTrayIcon()
-    tray.setIcon(icons[10])  # start "unknown"
+    tray.setIcon(icons[10])  # unknown on start
     tray.setVisible(True)
 
-    # Function that updates the tray icon & tooltip
     def changeBatteryStatus(icon_index, voltage, percentage):
         tray.setIcon(icons[icon_index])
         s = f"{percentage:.1f}% ({voltage:.2f}V)"
@@ -321,7 +335,7 @@ if __name__ == "__main__":
             f"Icon: {icon_index} ({iconnames[icon_index]}) => {s}"
         )
 
-    # QThread usage
+    # Thread
     thread = QThread()
     worker = Worker()
     worker.moveToThread(thread)
@@ -332,17 +346,17 @@ if __name__ == "__main__":
     worker.finished.connect(app.quit)
     thread.finished.connect(thread.deleteLater)
 
+    # Signals
     worker.trayMessage.connect(changeBatteryStatus)
     worker.logMessage.connect(message)
 
-    # Create tray menu
+    # Tray menu
     menu = QMenu()
     quit_action = QAction("Quit")
     quit_action.triggered.connect(halt)
     menu.addAction(quit_action)
     tray.setContextMenu(menu)
 
-    # Start the thread
+    # Start
     thread.start()
-
     sys.exit(app.exec_())
