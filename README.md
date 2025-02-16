@@ -35,8 +35,7 @@ From a terminal, clone this projet (the first time only), go to its directory, m
 ```bash
 git clone https://github.com/cyberpunk042/pios-ina219-batterystatus.git
 cd pios-ina219-batterystatus/
-chmod +x ./batteryStatus.py
-./batteryStatus.py
+python ./batteryStatus.py
 ```
 
 ### To install
