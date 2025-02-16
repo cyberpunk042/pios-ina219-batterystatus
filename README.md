@@ -1,5 +1,7 @@
 # INA219 Battery status
 
+## Work with Raspberry Pi 5 | 4B latest OS 
+
 Battery status for the INA219 sensor on I2C with the native Linux Raspberry Pi OS, standing in the system tray, written with python3 and python3-pyqt5. _INA219 interpretation still require a bit more fine tuning_. *Possibly different parameters, e.g. minV, maxV,.. in many cases*.
 
 ![Animation](anim.gif)
@@ -31,18 +33,20 @@ $ sudo apt install python3-pyqt5
 
 From a terminal, clone this projet (the first time only), go to its directory, make it executable (the first time only), run it and enjoy!
 
-### To test
+### To checkout
 ```bash
 git clone https://github.com/cyberpunk042/pios-ina219-batterystatus.git
 cd pios-ina219-batterystatus/
+```
+
+### To test
+```bash
 python ./batteryStatus.py
 ```
 
 ### To install
 
 ```bash
-git clone https://github.com/cyberpunk042/pios-ina219-batterystatus.git
-cd pios-ina219-batterystatus/
 sudo python install.py <user>
 ```
 Then reboot
