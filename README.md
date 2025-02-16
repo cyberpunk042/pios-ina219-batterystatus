@@ -4,7 +4,7 @@ Battery status for the INA219 sensor on I2C with the native Linux Raspberry Pi O
 
 ![Animation](anim.gif)
 
-## Features
+## Features (Copy paste & adapted from crowPi-L developments)
 
 - Running on the native Linux Raspberry Pi OS,
 - standing in the system tray,
@@ -16,6 +16,11 @@ Battery status for the INA219 sensor on I2C with the native Linux Raspberry Pi O
 - based on the official python script delivered by CrowPi (`/usr/local/sbin/getPowerBattery.py`),
 - multi-threaded app to access the battery data with I2C.
 
+## Requirements
+
+- an INA219 connected via I2C
+- [Pi-Apps](https://pi-apps.io/install/) and [Autostar](https://pi-apps.io/install-app/install-autostar-on-raspberry-pi/)
+
 ## Installing and starting the application
 
 From a terminal, install python3-pyqt5
@@ -26,11 +31,19 @@ $ sudo apt install python3-pyqt5
 
 From a terminal, clone this projet (the first time only), go to its directory, make it executable (the first time only), run it and enjoy!
 
-```
-$ git clone git@github.com:ppyne/crowPi-L_BatteryStatus.git
-$ cd crowPi-L_BatteryStatus/
-$ chmod +x ./batteryStatus.py
-$ ./batteryStatus.py
+### To test
+```bash
+git clone https://github.com/cyberpunk042/pios-ina219-batterystatus.git
+cd pios-ina219-batterystatus/
+chmod +x ./batteryStatus.py
+./batteryStatus.py
 ```
 
-**Warning:** to quit the app properly, you must right click on its icon in the system tray and click the menu "Quit".
+### To install
+
+```bash
+git clone https://github.com/cyberpunk042/pios-ina219-batterystatus.git
+cd pios-ina219-batterystatus/
+sudo python install.py <user>
+```
+Then reboot
