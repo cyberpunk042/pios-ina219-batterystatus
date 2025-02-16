@@ -1,6 +1,6 @@
 # INA219 Battery status
 
-Battery status for the INA219 sensor on I2C with the native Linux Raspberry Pi OS, standing in the system tray, written with python3 and python3-pyqt5.
+Battery status for the INA219 sensor on I2C with the native Linux Raspberry Pi OS, standing in the system tray, written with python3 and python3-pyqt5. _INA219 interpretation still require a bit more fine tuning_. *Possibly different parameters, e.g. minV, maxV,.. in many cases*.
 
 ![Animation](anim.gif)
 
